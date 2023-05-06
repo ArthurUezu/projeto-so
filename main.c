@@ -7,6 +7,8 @@
 #define ESPERA 'e';
 #define INATIVO 'i';
 
+int pid = 0;
+
 typedef struct BCP {
     int id;
     char nome[30];
@@ -16,6 +18,16 @@ typedef struct BCP {
     int posicaoMemoria;
     struct BCP * proximo;
 } BCP;
+
+BCP* criarProcesso(int tempo){
+    BCP* processo = (BCP*) malloc(sizeof(BCP));
+    processo->id = pid;
+    processo->proximo = NULL;
+    processo->linhaInstrucao = 0;
+    processo->tempoRestante = tempo;
+    pid++;
+    return processo;
+}
 
 BCP* adicionarProcessoALista(BCP* lista, BCP* processo){
     BCP* cabecaLista = lista;
@@ -61,38 +73,37 @@ void semaforoV(int s){
 
 }
 
-void main(){
+int teste(){
     BCP* lista = NULL;
-    BCP* itemLista = (BCP*) malloc(sizeof(BCP));
-    itemLista->estado = ATIVO;
-    itemLista->id = 1;
-    itemLista->nome[0] = 'A';
-    itemLista->tempoRestante = 10;
-    itemLista->proximo = NULL;
-    BCP* itemLista2 =(BCP*) malloc(sizeof(BCP));
-    itemLista2->estado = ATIVO;
-    itemLista2->id = 2;
-    itemLista2->nome[0] = 'a';
-    itemLista2->tempoRestante = 11;
-    itemLista2->proximo = NULL;
-    BCP* itemLista3 = malloc(sizeof(BCP));
-    itemLista3->estado = ATIVO;
-    itemLista3->id = 1;
-    itemLista3->nome[0] = 'a';
-    itemLista3->tempoRestante = 14;
-    itemLista3->proximo = NULL;
-    BCP* itemLista4 = malloc(sizeof(BCP));
-    itemLista4->estado = ATIVO;
-    itemLista4->id = 1;
-    itemLista4->nome[0] = 'a';
-    itemLista4->tempoRestante = 12;
-    itemLista4->proximo = NULL;
-
-    lista = adicionarProcessoALista(lista, itemLista);
-    lista = adicionarProcessoALista(lista, itemLista2);
-    lista = adicionarProcessoALista(lista, itemLista3);
-    lista = adicionarProcessoALista(lista, itemLista4);
-    printf("%d",itemLista->id);
+    for(int i=0;i<100;i++){
+        BCP* processo = criarProcesso(i);
+        lista = adicionarProcessoALista(lista,processo);
+    }
+    for(int i=-100;i<0;i++){
+        BCP* processo = criarProcesso(i);
+        lista = adicionarProcessoALista(lista,processo);
+    }
     printaLista(lista);
+    lista = NULL;
+    for(int i=0;i<100;i=i+2){
+
+        BCP* processo = criarProcesso(i);
+
+        lista = adicionarProcessoALista(lista,processo);
+
+    }
+    for(int i=1;i<100;i=i+2){
+
+        BCP* processo = criarProcesso(i);
+
+        lista = adicionarProcessoALista(lista,processo);
+
+    }
+    printaLista(lista);
+
+}
+
+void main(){
+    teste();
     printf("\n");
 }
