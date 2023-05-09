@@ -1,5 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <semaphore.h>
 
 #define ATIVO 'a';
@@ -11,57 +12,118 @@ int pid = 0;
 
 typedef struct BCP {
     int id;
-    char nome[30];
+    char nome[40];
     char estado;
     int tempoRestante;
     int linhaInstrucao;
     int posicaoMemoria;
-    struct BCP * proximo;
+    struct BCP* proximo;
 } BCP;
 
-BCP* criarProcesso(int tempo){
-    BCP* processo = (BCP*) malloc(sizeof(BCP));
-    processo->id = pid;
-    processo->proximo = NULL;
-    processo->linhaInstrucao = 0;
-    processo->tempoRestante = tempo;
-    pid++;
-    return processo;
-}
+int pid = 0;
 
-BCP* adicionarProcessoALista(BCP* lista, BCP* processo){
-    BCP* cabecaLista = lista;
-    if(lista == NULL){
-        return processo;
+BCP* bcp = NULL;
+
+void adicionarProcessoAoBCP(BCP* processo){
+    BCP* cabecaLista = bcp;
+    if(bcp == NULL){
+        bcp = processo;
+        return;
     }
-    if(lista->proximo == NULL){
-        lista->proximo = processo;
-        return lista;
+    if(bcp->proximo == NULL){
+        bcp->proximo = processo;
+        return;
     }
-    BCP* proximo = lista->proximo;
+    BCP* proximo = bcp->proximo;
 
     while(proximo != NULL && proximo->tempoRestante < processo->tempoRestante){
         proximo = proximo->proximo;
-        lista = lista->proximo;
+        bcp = bcp->proximo;
     }
 
     processo->proximo = proximo;
-    lista->proximo = processo;
-    return cabecaLista;
+    bcp->proximo = processo;
+    bcp = cabecaLista;
 }
 
-void printaLista(BCP* lista){
-    printf("Id %d\n",lista->id);
-    printf("Nome %d\n",lista->nome);
-    printf("Tempo restante %d\n\n",lista->tempoRestante);
+void criarProcesso(char* fonte){
+    char aux[40]="./";
+    FILE* fontePrograma = fopen(strcat(aux,fonte),"r");
+    BCP* processo = (BCP*) malloc(sizeof(BCP));
+    processo->proximo = NULL;
 
-    while(lista->proximo != NULL){
-        lista = lista->proximo;
-        printf("Id %d\n",lista->id);
-        printf("Nome %d\n",lista->nome);
-        printf("Tempo restante %d\n\n",lista->tempoRestante);
+    fscanf(fontePrograma,"%s\n",processo->nome);
+    processo->id = pid;
+    processo->estado = PRONTO;
+    pid++;
+    int tempo = 0;
+    processo->tempoRestante = 0;
+    char instrucao[40] = "";
+    while(!feof(fontePrograma)){
+        fscanf(fontePrograma,"%s",&instrucao);
+        if(strcmp("exec",instrucao)==0){
+            printf("\nexec\n");
+        }
+        else if(strcmp("write",instrucao)==0){
+            printf("\nwrite\n");
+        }
+        else if(strcmp("read",instrucao)==0){
+            printf("\nread\n");
+        }
+        fscanf(fontePrograma,"%d\n",&tempo);
+        processo->tempoRestante += tempo;
+    }
+    adicionarProcessoAoBCP(processo);
+    return;
+}
+
+void finalizarProcesso(int pid){
+    BCP* cabecaLista = bcp;
+    BCP* proximo = bcp;
+    if(bcp->proximo != NULL) proximo = bcp->proximo;
+    if(bcp->id == pid){
+        free(bcp);
+        bcp = proximo;
+        return;
+    } 
+    while(proximo != NULL && proximo->id != pid){
+        bcp = bcp->proximo;
+        proximo = proximo->proximo;
+    }
+
+    if(proximo == NULL){
+        printf("\nProcesso não encontrado\n");
+        return;
+    }
+
+    bcp->proximo = proximo->proximo;
+    free(proximo);
+    printf("\nProcesso finalizado\n");
+}
+
+void printaBCP(){
+    if(bcp == NULL) return;
+    printf("Id %d\n",bcp->id);
+    printf("Nome %s\n",bcp->nome);
+    printf("Tempo restante %d\n\n",bcp->tempoRestante);
+
+    while(bcp->proximo != NULL){
+        bcp = bcp->proximo;
+        printf("Id %d\n",bcp->id);
+        printf("Nome %s\n",bcp->nome);
+        printf("Tempo restante %d\n\n",bcp->tempoRestante);
     }
 }
+
+void limparBCP(){
+    BCP* aux = bcp;
+    while(bcp->proximo != NULL){
+        bcp = bcp->proximo;
+        free(aux);
+        aux = bcp;
+    }
+}
+
 
 void semaforoP(int s, BCP* processo){
     if(s > 0){
@@ -73,37 +135,12 @@ void semaforoV(int s){
 
 }
 
-int teste(){
-    BCP* lista = NULL;
-    for(int i=0;i<100;i++){
-        BCP* processo = criarProcesso(i);
-        lista = adicionarProcessoALista(lista,processo);
+void main(int argc, char* argv[]){
+    BCP* bcp = NULL;
+    for(int i=1;i<argc;i++){
+        criarProcesso(argv[i]);
     }
-    for(int i=-100;i<0;i++){
-        BCP* processo = criarProcesso(i);
-        lista = adicionarProcessoALista(lista,processo);
-    }
-    printaLista(lista);
-    lista = NULL;
-    for(int i=0;i<100;i=i+2){
-
-        BCP* processo = criarProcesso(i);
-
-        lista = adicionarProcessoALista(lista,processo);
-
-    }
-    for(int i=1;i<100;i=i+2){
-
-        BCP* processo = criarProcesso(i);
-
-        lista = adicionarProcessoALista(lista,processo);
-
-    }
-    printaLista(lista);
-
-}
-
-void main(){
-    teste();
-    printf("\n");
+    finalizarProcesso(3);
+    printaBCP();
+    limparBCP();
 }
