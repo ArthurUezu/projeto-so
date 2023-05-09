@@ -8,11 +8,12 @@
 #define ESPERA 'e';
 #define INATIVO 'i';
 
+int pid = 0;
+
 typedef struct BCP {
     int id;
     char nome[40];
     char estado;
-    int tempoTotal;
     int tempoRestante;
     int linhaInstrucao;
     int posicaoMemoria;
@@ -133,8 +134,6 @@ void semaforoP(int s, BCP* processo){
 void semaforoV(int s){
 
 }
-
-
 
 void main(int argc, char* argv[]){
     BCP* bcp = NULL;
