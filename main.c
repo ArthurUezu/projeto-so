@@ -57,7 +57,7 @@ void criarProcesso(char* fonte){
     pid++;
     int tempo = 0;
     processo->tempoRestante = 0;
-    char instrucao[10] = "";
+    char instrucao[40] = "";
     while(!feof(fontePrograma)){
         fscanf(fontePrograma,"%s",&instrucao);
         if(strcmp("exec",instrucao)==0){
@@ -76,6 +76,30 @@ void criarProcesso(char* fonte){
     return;
 }
 
+void finalizarProcesso(int pid){
+    BCP* cabecaLista = bcp;
+    BCP* proximo = bcp;
+    if(bcp->proximo != NULL) proximo = bcp->proximo;
+    if(bcp->id == pid){
+        free(bcp);
+        bcp = proximo;
+        return;
+    } 
+    while(proximo != NULL && proximo->id != pid){
+        bcp = bcp->proximo;
+        proximo = proximo->proximo;
+    }
+
+    if(proximo == NULL){
+        printf("\nProcesso não encontrado\n");
+        return;
+    }
+
+    bcp->proximo = proximo->proximo;
+    free(proximo);
+    printf("\nProcesso finalizado\n");
+}
+
 void printaBCP(){
     if(bcp == NULL) return;
     printf("Id %d\n",bcp->id);
@@ -85,7 +109,7 @@ void printaBCP(){
     while(bcp->proximo != NULL){
         bcp = bcp->proximo;
         printf("Id %d\n",bcp->id);
-        printf("Nome %d\n",bcp->nome);
+        printf("Nome %s\n",bcp->nome);
         printf("Tempo restante %d\n\n",bcp->tempoRestante);
     }
 }
@@ -117,6 +141,7 @@ void main(int argc, char* argv[]){
     for(int i=1;i<argc;i++){
         criarProcesso(argv[i]);
     }
+    finalizarProcesso(3);
     printaBCP();
     limparBCP();
 }
