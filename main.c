@@ -8,8 +8,6 @@
 #define ESPERA 'e';
 #define INATIVO 'i';
 
-int pid = 0;
-
 typedef struct BCP {
     int id;
     char nome[40];
@@ -17,6 +15,7 @@ typedef struct BCP {
     int tempoRestante;
     int linhaInstrucao;
     int posicaoMemoria;
+    FILE* arquivoFonte;
     struct BCP* proximo;
 } BCP;
 
@@ -48,19 +47,19 @@ void adicionarProcessoAoBCP(BCP* processo){
 
 void criarProcesso(char* fonte){
     char aux[40]="./";
-    FILE* fontePrograma = fopen(strcat(aux,fonte),"r");
     BCP* processo = (BCP*) malloc(sizeof(BCP));
+    processo->arquivoFonte = fopen(strcat(aux,fonte),"r");
     processo->proximo = NULL;
 
-    fscanf(fontePrograma,"%s\n",processo->nome);
+    fscanf(processo->arquivoFonte,"%s\n",processo->nome);
     processo->id = pid;
     processo->estado = PRONTO;
     pid++;
     int tempo = 0;
     processo->tempoRestante = 0;
     char instrucao[40] = "";
-    while(!feof(fontePrograma)){
-        fscanf(fontePrograma,"%s",&instrucao);
+    while(!feof(processo->arquivoFonte)){
+        fscanf(processo->arquivoFonte,"%s",&instrucao);
         if(strcmp("exec",instrucao)==0){
             printf("\nexec\n");
         }
@@ -70,7 +69,7 @@ void criarProcesso(char* fonte){
         else if(strcmp("read",instrucao)==0){
             printf("\nread\n");
         }
-        fscanf(fontePrograma,"%d\n",&tempo);
+        fscanf(processo->arquivoFonte,"%d\n",&tempo);
         processo->tempoRestante += tempo;
     }
     adicionarProcessoAoBCP(processo);
@@ -82,6 +81,7 @@ void finalizarProcesso(int pid){
     BCP* proximo = bcp;
     if(bcp->proximo != NULL) proximo = bcp->proximo;
     if(bcp->id == pid){
+        fclose(bcp->arquivoFonte);
         free(bcp);
         bcp = proximo;
         return;
@@ -92,11 +92,13 @@ void finalizarProcesso(int pid){
     }
 
     if(proximo == NULL){
+        bcp = cabecaLista;
         printf("\nProcesso não encontrado\n");
         return;
     }
 
     bcp->proximo = proximo->proximo;
+    fclose(proximo->arquivoFonte);
     free(proximo);
     printf("\nProcesso finalizado\n");
 }
@@ -126,13 +128,33 @@ void limparBCP(){
 
 
 void semaforoP(int s, BCP* processo){
-    if(s > 0){
-        s--;
-    }
+    //TODO
+    return;
 }
 
 void semaforoV(int s){
+    //TODO
+    return;
+}
 
+void interrupcaoProcesso(){
+    //TODO
+    return;
+}
+
+void executaProcesso(){
+    //TODO
+    return;
+}
+
+void memLoadReq(){
+    //TODO
+    return;
+}
+
+void memLoadFinish(){
+    //TODO
+    return;
 }
 
 void main(int argc, char* argv[]){
