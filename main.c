@@ -3,10 +3,10 @@
 #include <string.h>
 #include <semaphore.h>
 
-#define ATIVO 'a';
-#define PRONTO 'p';
-#define ESPERA 'e';
-#define INATIVO 'i';
+#define ATIVO 'a'
+#define PRONTO 'p'
+#define ESPERA 'e'
+#define INATIVO 'i'
 
 typedef struct BCP {
     int id;
@@ -55,23 +55,16 @@ void criarProcesso(char* fonte){
     processo->id = pid;
     processo->estado = PRONTO;
     pid++;
-    int tempo = 0;
     processo->tempoRestante = 0;
+    int tempo = 0;
     char instrucao[40] = "";
     while(!feof(processo->arquivoFonte)){
         fscanf(processo->arquivoFonte,"%s",&instrucao);
-        if(strcmp("exec",instrucao)==0){
-            printf("\nexec\n");
-        }
-        else if(strcmp("write",instrucao)==0){
-            printf("\nwrite\n");
-        }
-        else if(strcmp("read",instrucao)==0){
-            printf("\nread\n");
-        }
         fscanf(processo->arquivoFonte,"%d\n",&tempo);
         processo->tempoRestante += tempo;
     }
+    fseek(processo->arquivoFonte, 0, SEEK_SET);
+    fscanf(processo->arquivoFonte,"%s\n",&instrucao);
     adicionarProcessoAoBCP(processo);
     return;
 }
@@ -81,11 +74,18 @@ void finalizarProcesso(int pid){
     BCP* proximo = bcp;
     if(bcp->proximo != NULL) proximo = bcp->proximo;
     if(bcp->id == pid){
-        fclose(bcp->arquivoFonte);
-        free(bcp);
-        bcp = proximo;
+        if(proximo == bcp){
+            fclose(bcp->arquivoFonte);
+            free(bcp);
+            bcp = NULL;
+        }
+        else {
+            fclose(bcp->arquivoFonte);
+            free(bcp);
+            bcp = proximo;
+        }
         return;
-    } 
+    }
     while(proximo != NULL && proximo->id != pid){
         bcp = bcp->proximo;
         proximo = proximo->proximo;
@@ -105,16 +105,21 @@ void finalizarProcesso(int pid){
 
 void printaBCP(){
     if(bcp == NULL) return;
+    BCP* cabeca = bcp;
+    printf("\n\nBCP:\n");
     printf("Id %d\n",bcp->id);
     printf("Nome %s\n",bcp->nome);
+    printf("Estado %c\n",bcp->estado);
     printf("Tempo restante %d\n\n",bcp->tempoRestante);
 
     while(bcp->proximo != NULL){
         bcp = bcp->proximo;
         printf("Id %d\n",bcp->id);
         printf("Nome %s\n",bcp->nome);
+        printf("Estado %c\n",bcp->estado);
         printf("Tempo restante %d\n\n",bcp->tempoRestante);
     }
+    bcp = cabeca;
 }
 
 void limparBCP(){
@@ -127,7 +132,7 @@ void limparBCP(){
 }
 
 
-void semaforoP(int s, BCP* processo){
+void semaforoP(int s){
     //TODO
     return;
 }
@@ -142,9 +147,31 @@ void interrupcaoProcesso(){
     return;
 }
 
+
 void executaProcesso(){
-    //TODO
-    return;
+    BCP* processo = bcp;
+    printf("Executando processo com PID: %d", processo->id);
+    if(feof(processo->arquivoFonte)){
+        printf("\nExecução do processo chegou ao fim.\n");
+        finalizarProcesso(processo->id);
+        return;
+    }
+    if(processo->estado != ATIVO){
+        processo->estado = ATIVO;
+    }
+    char instrucao[40] = "";
+    int tempo = 0;
+    fscanf(processo->arquivoFonte,"%s",&instrucao);
+    fscanf(processo->arquivoFonte,"%d\n",&tempo);
+    processo->linhaInstrucao++;
+    processo->tempoRestante -= tempo;
+    printf("\nInstrução: %s\nTempo de execução: %d\n",instrucao,tempo);
+    if(processo->tempoRestante <= 0){
+        printf("O processo chegou ao final\n");
+        finalizarProcesso(processo->id);
+    }
+    printaBCP();
+    processo->estado = PRONTO;
 }
 
 void memLoadReq(){
@@ -156,13 +183,19 @@ void memLoadFinish(){
     //TODO
     return;
 }
+void ShortestRemainingTimeFirst(){
+    while(1){
+        //menu
+        if(bcp == NULL) return;
+        executaProcesso();
+    }
+}
 
 void main(int argc, char* argv[]){
-    BCP* bcp = NULL;
     for(int i=1;i<argc;i++){
         criarProcesso(argv[i]);
     }
-    finalizarProcesso(3);
-    printaBCP();
-    limparBCP();
+    ShortestRemainingTimeFirst();
+    // executaProcesso();
+    // limparBCP();
 }
