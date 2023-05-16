@@ -1,16 +1,9 @@
 # TO DO
 
 - Semáforos
-- Interface
-- Execução do processo 
+- Gerenciamento de memória
 ## Gerenciamento de memória
-  - Vetor de memória (1000 posições, cada 1kb)
-  - Segmento (parte do processo)
-  - Pagina (posição no vetor da memória)
-  - Tabela de segmentos
-  - Tabela de páginas (segmento são contidos em várias páginas)
-  - Mapa de espaços
-  - Alocação do programa na memória
+  - Pode ser feita por representação num
 
 ## Especificações do lele
 
