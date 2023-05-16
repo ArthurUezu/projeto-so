@@ -182,11 +182,17 @@ void executaProcesso(){
     char instrucao[40] = "";
     int tempo = 0;
     fscanf(processo->arquivoFonte,"%s",&instrucao);
-    fscanf(processo->arquivoFonte,"%d\n",&tempo);
+    if(instrucao == "P" || instrucao == "V"){
+        //SEMAFORO
+        tempo = 200;
+    }
+    else {
+        fscanf(processo->arquivoFonte,"%d\n",&tempo);
+    }
     processo->linhaInstrucao++;
     processo->tempoRestante -= tempo;
     printf("\nInstrução: %s\nTempo de execução: %d\n",instrucao,tempo);
-    if(processo->tempoRestante <= 0){
+    if(processo->tempoRestante <= 0 || instrucao != "exec"){
         interrupcaoProcesso();
     }
 }
