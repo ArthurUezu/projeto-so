@@ -23,6 +23,25 @@ int pid = 0;
 
 BCP* bcp = NULL;
 
+void interrupcaoProcesso(){
+    if(bcp->tempoRestante == 0){
+        printf("\nExecução do processo chegou ao fim.\n");
+        finalizarProcesso(bcp->id);
+        return;
+    }
+    if(bcp->proximo != NULL){
+        BCP* proximo = bcp->proximo;
+        bcp->estado = ESPERA;
+        bcp->proximo = proximo->proximo;
+        proximo->proximo = bcp;
+
+        proximo->estado = ATIVO;
+        bcp = proximo;
+    }
+
+    return;
+}
+
 void adicionarProcessoAoBCP(BCP* processo){
     BCP* cabecaLista = bcp;
     if(bcp == NULL){
@@ -30,7 +49,10 @@ void adicionarProcessoAoBCP(BCP* processo){
         return;
     }
     if(bcp->proximo == NULL){
-        bcp->proximo = processo;
+            bcp->proximo = processo;
+        if(bcp->tempoRestante > processo->tempoRestante){
+            interrupcaoProcesso();
+        }
         return;
     }
     BCP* proximo = bcp->proximo;
@@ -84,6 +106,7 @@ void finalizarProcesso(int pid){
             free(bcp);
             bcp = proximo;
         }
+        if(bcp != NULL) bcp->estado = ATIVO;
         return;
     }
     while(proximo != NULL && proximo->id != pid){
@@ -98,6 +121,7 @@ void finalizarProcesso(int pid){
     }
 
     bcp->proximo = proximo->proximo;
+    bcp->estado = ATIVO;
     fclose(proximo->arquivoFonte);
     free(proximo);
     printf("\nProcesso finalizado\n");
@@ -142,18 +166,14 @@ void semaforoV(int s){
     return;
 }
 
-void interrupcaoProcesso(){
-    //TODO
-    return;
-}
+
 
 
 void executaProcesso(){
     BCP* processo = bcp;
     printf("Executando processo com PID: %d", processo->id);
     if(feof(processo->arquivoFonte)){
-        printf("\nExecução do processo chegou ao fim.\n");
-        finalizarProcesso(processo->id);
+        interrupcaoProcesso();
         return;
     }
     if(processo->estado != ATIVO){
@@ -167,11 +187,8 @@ void executaProcesso(){
     processo->tempoRestante -= tempo;
     printf("\nInstrução: %s\nTempo de execução: %d\n",instrucao,tempo);
     if(processo->tempoRestante <= 0){
-        printf("O processo chegou ao final\n");
-        finalizarProcesso(processo->id);
+        interrupcaoProcesso();
     }
-    printaBCP();
-    processo->estado = PRONTO;
 }
 
 void memLoadReq(){
@@ -183,11 +200,54 @@ void memLoadFinish(){
     //TODO
     return;
 }
+
+void menu(){
+    int escolha = -1;
+    printaBCP();
+    while(escolha == -1){
+        printf("\n\nDigite a opção!\n");
+        printf("0) Executar até o fim\n");
+        printf("1) Executar\n");
+        printf("2) Adicionar processo\n");
+        printf("3) Interromper processo\n");
+        printf("4) Matar processo\n");
+        printf("5) Finalizar\nDigite: ");
+        scanf("%d",&escolha);
+    }
+    switch(escolha){
+        case 0:
+            while(bcp!=NULL){
+                executaProcesso();
+            }
+            break;
+        case 1:
+            executaProcesso();
+            break;
+        case 2:
+            char arquivo[50] = "";
+            printf("\n\nDigite o PATH ('./nomearquivo')\nDigite: ");
+            scanf("%s",arquivo);
+            criarProcesso(arquivo);
+            break;
+        case 3:
+            interrupcaoProcesso();
+            break;
+        case 4:
+            printf("\n\nDigite o id do processo que deseja matar\nDigite: ");
+            scanf("%d",&escolha);
+            finalizarProcesso(escolha);
+            break;
+        case 5:
+            limparBCP();
+            break;
+            
+
+    }
+}
 void ShortestRemainingTimeFirst(){
     while(1){
-        //menu
+        menu();
         if(bcp == NULL) return;
-        executaProcesso();
     }
 }
 
