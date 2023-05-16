@@ -21,6 +21,8 @@ typedef struct BCP {
 
 int pid = 0;
 
+int memoria = 1000;
+
 BCP* bcp = NULL;
 
 void interrupcaoProcesso(){
@@ -34,7 +36,6 @@ void interrupcaoProcesso(){
         bcp->estado = ESPERA;
         bcp->proximo = proximo->proximo;
         proximo->proximo = bcp;
-
         proximo->estado = ATIVO;
         bcp = proximo;
     }
@@ -166,9 +167,6 @@ void semaforoV(int s){
     return;
 }
 
-
-
-
 void executaProcesso(){
     BCP* processo = bcp;
     printf("Executando processo com PID: %d", processo->id);
@@ -192,7 +190,8 @@ void executaProcesso(){
     processo->linhaInstrucao++;
     processo->tempoRestante -= tempo;
     printf("\nInstrução: %s\nTempo de execução: %d\n",instrucao,tempo);
-    if(processo->tempoRestante <= 0 || instrucao != "exec"){
+
+    if(processo->tempoRestante <= 0 || strcmp(instrucao,"exec")){
         interrupcaoProcesso();
     }
 }
