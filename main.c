@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <semaphore.h>
-
+#include <unistd.h>
+#include <termios.h>
+#include <sys/select.h>
 #define ATIVO 'a'
 #define PRONTO 'p'
 #define ESPERA 'e'
@@ -167,6 +168,10 @@ void semaforoV(int s){
 
 void executaProcesso(){
     BCP* processo = bcp;
+    if(processo == NULL) {
+        printf("\nBCP vazio, para adicionar processos, abra o menu\n");
+        return;
+    }
     printf("Executando processo com PID: %d", processo->id);
     if(feof(processo->arquivoFonte)){
         interrupcaoProcesso();
@@ -207,41 +212,32 @@ void memLoadFinish(){
 int menu(){
     int escolha = -1;
     printaBCP();
-    while(escolha == -1){
+    printf("\nAperte ENTER para abrir o menu\n");
+    if(kbhit()){
         printf("\n\nDigite a opção!\n");
-        printf("0) Executar até o fim\n");
-        printf("1) Executar\n");
-        printf("2) Adicionar processo\n");
-        printf("3) Interromper processo\n");
-        printf("4) Matar processo\n");
-        printf("5) Finalizar\nDigite: ");
+        printf("1) Adicionar processo\n");
+        printf("2) Matar processo\n");
+        printf("3) Sair\nDigite: ");
+    
         scanf("%d",&escolha);
     }
     switch(escolha){
-        case 0:
-            while(bcp!=NULL)
-                executaProcesso();
-            break;
+        
         case 1:
-            executaProcesso();
-            break;
-        case 2:
             char arquivo[50] = "";
             printf("\n\nDigite o PATH ('./nomearquivo')\nDigite: ");
             scanf("%s",arquivo);
             criarProcesso(arquivo);
             break;
-        case 3:
-            interrupcaoProcesso();
-            break;
-        case 4:
+        case 2:
             printf("\n\nDigite o id do processo que deseja matar\nDigite: ");
             scanf("%d",&escolha);
             finalizarProcesso(escolha);
             break;
-        case 5:
+        case 3:
             limparBCP();
-            finalizarProcesso(bcp->id);
+            if(bcp != NULL)
+                finalizarProcesso(bcp->id);
             return 0;
             break;
         
@@ -249,8 +245,26 @@ int menu(){
     }
     return 1;
 }
+int kbhit()
+{
+    struct timeval tv;
+    fd_set fds;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
+    select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+    return FD_ISSET(STDIN_FILENO, &fds);
+}
+
 void ShortestRemainingTimeFirst(){
-    while(menu());
+    int finalizar = 1;
+    while(finalizar){
+        system("clear");
+        executaProcesso();
+        finalizar = menu();
+        sleep(1);
+    }
 }
 
 int main(int argc, char* argv[]){
@@ -258,7 +272,5 @@ int main(int argc, char* argv[]){
         criarProcesso(argv[i]);
     }
     ShortestRemainingTimeFirst();
-    // executaProcesso();
-    // limparBCP();
     return 0;
 }
