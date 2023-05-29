@@ -9,6 +9,8 @@
 #define ESPERA 'e'
 #define INATIVO 'i'
 
+int memoria[1000]; //1000 posições, cada posição corresponde a 8kbytes
+int espfree=1000;
 typedef struct BCP {
     int id;
     char nome[40];
@@ -16,9 +18,11 @@ typedef struct BCP {
     int tempoRestante;
     int linhaInstrucao;
     int posicaoMemoria;
+    int tamanho;
     FILE* arquivoFonte;
     struct BCP* proximo;
 } BCP;
+
 
 int pid = 0;
 
@@ -109,7 +113,10 @@ void criarProcesso(char* fonte){
     processo->proximo = NULL;
 
     fscanf(processo->arquivoFonte,"%s\n",processo->nome);
-    processo->id = pid;
+    printf("%s",processo->nome);
+    fscanf(processo->arquivoFonte,"\n%d\n",&processo->id);
+    printf("%d",processo->id);
+    fscanf(processo->arquivoFonte,"\n%d\n",&processo->tamanho);
     processo->estado = PRONTO;
     pid++;
     processo->tempoRestante = 0;
@@ -199,8 +206,20 @@ void executaProcesso(){
     }
 }
 
-void memLoadReq(){
-    //TODO
+void memLoadReq(BCP * processo){
+    BCP * processo = processo;
+    int pid = processo->id;
+    int tamanho = (processo->tamanho)/8;
+    for (int i=1;i<1000;i++){
+        if (memoria[i]==0){
+            if(tamanho!=0){
+                memoria[i]=pid;
+                tamanho--;
+                espfree--;
+            }
+            
+        }
+    }
     return;
 }
 
