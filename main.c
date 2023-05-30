@@ -9,8 +9,8 @@
 #define ESPERA 'e'
 #define INATIVO 'i'
 
-int memoria[1000]; //1000 posições, cada posição corresponde a 8kbytes
-int espfree=1000;
+int memoria[125000]; //125000 posições, cada posição corresponde a 8kbytes
+long espfree=125000;
 typedef struct BCP {
     int id;
     char nome[40];
@@ -25,6 +25,37 @@ typedef struct BCP {
 
 
 int pid = 0;
+
+void memLoadReq(BCP * processo){
+    BCP * processo = processo;
+    int pid = processo->id;
+    int tamanho = (processo->tamanho)/8;
+    for (int i=1;i<125000;i++){
+        if (memoria[i]==0){
+            if(tamanho!=0){
+                memoria[i]=pid;
+                tamanho--;
+                espfree--;
+            }
+            
+        }
+    }
+}
+
+void memLoadFinish(BCP * processo){
+    BCP  * process = processo;
+    int nblocos = (process->tamanho)/8;
+    int i=0;
+    for (int i=1;i<125000;i++){
+        if (process->id==memoria[i]){
+            memoria[i]=0;
+            nblocos--;
+        }
+        else if (nblocos==0){
+            break;
+        }
+    }
+}
 
 BCP* bcp = NULL;
 void finalizarProcesso(int pid){
@@ -60,6 +91,7 @@ void finalizarProcesso(int pid){
     bcp->estado = ATIVO;
     fclose(proximo->arquivoFonte);
     free(proximo);
+    memLoadFinish(proximo);
     printf("\nProcesso finalizado\n");
 }
 
@@ -104,6 +136,7 @@ void adicionarProcessoAoBCP(BCP* processo){
     processo->proximo = proximo;
     bcp->proximo = processo;
     bcp = cabecaLista;
+    memLoadReq(processo);
 }
 
 void criarProcesso(char* fonte){
@@ -142,6 +175,7 @@ void printaBCP(){
     printf("Nome %s\n",bcp->nome);
     printf("Estado %c\n",bcp->estado);
     printf("Tempo restante %d\n\n",bcp->tempoRestante);
+
 
     while(bcp->proximo != NULL){
         bcp = bcp->proximo;
@@ -199,34 +233,14 @@ void executaProcesso(){
     }
     processo->linhaInstrucao++;
     processo->tempoRestante -= tempo;
-    printf("\nInstrução: %s\nTempo de execução: %d\n",instrucao,tempo);
+    printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %dmb\n",instrucao,tempo,espfree*8/1000);
 
     if(processo->tempoRestante <= 0 || strcmp(instrucao,"exec")){
         interrupcaoProcesso();
     }
 }
 
-void memLoadReq(BCP * processo){
-    BCP * processo = processo;
-    int pid = processo->id;
-    int tamanho = (processo->tamanho)/8;
-    for (int i=1;i<1000;i++){
-        if (memoria[i]==0){
-            if(tamanho!=0){
-                memoria[i]=pid;
-                tamanho--;
-                espfree--;
-            }
-            
-        }
-    }
-    return;
-}
 
-void memLoadFinish(){
-    //TODO
-    return;
-}
 
 int menu(){
     int escolha = -1;
