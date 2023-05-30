@@ -29,13 +29,14 @@ int pid = 0;
 void memLoadReq(BCP * processo){
     BCP * process = processo;
     int pid = process->id;
-    int tamanho = (process->tamanho)/8;
+    int tamanho = (int)((process->tamanho)/8);
+    printf("tamanho do programa %d",tamanho);
     for (int i=1;i<125000;i++){
         if (memoria[i]==0){
             if(tamanho!=0){
                 memoria[i]=pid;
                 tamanho--;
-                espfree--;
+                espfree=espfree-1;
             }
             
         }
@@ -44,8 +45,9 @@ void memLoadReq(BCP * processo){
 
 void memLoadFinish(BCP * processo){
     BCP  * process = processo;
-    int nblocos = (process->tamanho)/8;
+    int nblocos = (int)((process->tamanho)/8);
     int i=0;
+    espfree=espfree+nblocos;
     for (int i=1;i<125000;i++){
         if (process->id==memoria[i]){
             memoria[i]=0;
@@ -55,6 +57,7 @@ void memLoadFinish(BCP * processo){
             break;
         }
     }
+    
 }
 
 BCP* bcp = NULL;
@@ -146,10 +149,8 @@ void criarProcesso(char* fonte){
     processo->proximo = NULL;
 
     fscanf(processo->arquivoFonte,"%s\n",processo->nome);
-    printf("%s",processo->nome);
-    fscanf(processo->arquivoFonte,"\n%d\n",&processo->id);
-    printf("%d",processo->id);
-    fscanf(processo->arquivoFonte,"\n%d\n",&processo->tamanho);
+    fscanf(processo->arquivoFonte,"%d\n",&processo->id);
+    fscanf(processo->arquivoFonte,"%d\n\n",&processo->tamanho);
     processo->estado = PRONTO;
     pid++;
     processo->tempoRestante = 0;
@@ -157,11 +158,18 @@ void criarProcesso(char* fonte){
     char instrucao[40] = "";
     while(!feof(processo->arquivoFonte)){
         fscanf(processo->arquivoFonte,"%s",instrucao);
-        fscanf(processo->arquivoFonte,"%d\n",&tempo);
+        if(instrucao[0]=='P' || instrucao[0]=='V'){
+            tempo=200;
+        }
+        else{
+            fscanf(processo->arquivoFonte,"%d\n",&tempo);
+        }
         processo->tempoRestante += tempo;
     }
     fseek(processo->arquivoFonte, 0, SEEK_SET);
     fscanf(processo->arquivoFonte,"%s\n",instrucao);
+    fscanf(processo->arquivoFonte,"%d\n",&processo->id);
+    fscanf(processo->arquivoFonte,"%d\n\n",&processo->tamanho);
     adicionarProcessoAoBCP(processo);
     return;
 }
@@ -174,15 +182,18 @@ void printaBCP(){
     printf("Id %d\n",bcp->id);
     printf("Nome %s\n",bcp->nome);
     printf("Estado %c\n",bcp->estado);
-    printf("Tempo restante %d\n\n",bcp->tempoRestante);
-
+    printf("Tempo restante %d\n",bcp->tempoRestante);
+    printf("Linha de instrução %d\n",bcp->linhaInstrucao);
+    printf("Memória ocupada %dkb\n\n", bcp->tamanho);
 
     while(bcp->proximo != NULL){
         bcp = bcp->proximo;
         printf("Id %d\n",bcp->id);
         printf("Nome %s\n",bcp->nome);
         printf("Estado %c\n",bcp->estado);
-        printf("Tempo restante %d\n\n",bcp->tempoRestante);
+        printf("Tempo restante %d\n",bcp->tempoRestante);
+        printf("Linha de instrução %d\n",bcp->linhaInstrucao);
+        printf("Memória ocupada %dkb\n\n", bcp->tamanho);
     }
     bcp = cabeca;
 }
@@ -194,17 +205,6 @@ void limparBCP(){
         free(aux);
         aux = bcp;
     }
-}
-
-
-void semaforoP(int s){
-    //TODO
-    return;
-}
-
-void semaforoV(int s){
-    //TODO
-    return;
 }
 
 void executaProcesso(){
@@ -224,23 +224,33 @@ void executaProcesso(){
     char instrucao[40] = "";
     int tempo = 0;
     fscanf(processo->arquivoFonte,"%s",instrucao);
-    if(instrucao == "P" || instrucao == "V"){
-        //SEMAFORO
+    if(instrucao[0]=='P' || instrucao[0]=='V'){
+        // SEMÁFORO
         tempo = 200;
-    }
-    else {
+
+    } else {
         fscanf(processo->arquivoFonte,"%d\n",&tempo);
     }
     processo->linhaInstrucao++;
     processo->tempoRestante -= tempo;
-    printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %dmb\n",instrucao,tempo,espfree*8/1000);
+    printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %ldmb\n",instrucao,tempo,espfree*8/1000);
 
-    if(processo->tempoRestante <= 0 || strcmp(instrucao,"exec")){
+    if(processo->tempoRestante <= 0 ){
         interrupcaoProcesso();
     }
 }
 
-
+int kbhit()
+{
+    struct timeval tv;
+    fd_set fds;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
+    select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+    return FD_ISSET(STDIN_FILENO, &fds);
+}
 
 int menu(){
     int escolha = -1;
@@ -278,17 +288,7 @@ int menu(){
     }
     return 1;
 }
-int kbhit()
-{
-    struct timeval tv;
-    fd_set fds;
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
-    select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
-    return FD_ISSET(STDIN_FILENO, &fds);
-}
+
 
 void ShortestRemainingTimeFirst(){
     int finalizar = 1;
