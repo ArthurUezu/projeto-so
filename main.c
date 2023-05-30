@@ -27,9 +27,9 @@ typedef struct BCP {
 int pid = 0;
 
 void memLoadReq(BCP * processo){
-    BCP * processo = processo;
-    int pid = processo->id;
-    int tamanho = (processo->tamanho)/8;
+    BCP * process = processo;
+    int pid = process->id;
+    int tamanho = (process->tamanho)/8;
     for (int i=1;i<125000;i++){
         if (memoria[i]==0){
             if(tamanho!=0){
