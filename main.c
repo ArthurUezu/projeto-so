@@ -1,3 +1,12 @@
+/*
+    Feito por Miguel Donizeti da Silva e Silva
+              Arthur Borsonaro Uezu
+              Luis Felipe Furilli
+
+
+*/
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
