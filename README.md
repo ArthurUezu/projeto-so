@@ -1,7 +1,8 @@
 # TO DO
 
 - Semáforos
-- Gerenciamento de memória
+- Algoritmo da segunda chance
+- Não deixar colocar mais de um processo com mesmo PID
 ## Gerenciamento de memória
   - Pode ser feita por representação num
 
