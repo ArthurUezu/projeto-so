@@ -40,27 +40,27 @@ BCP* bcp = NULL;
 
 void adicionarProcessoAoBCP(BCP* processo);
 
-void printaBCP(BCP* lista){
-    if(lista == NULL) return;
-    BCP* cabeca = lista;
+void printaBCP(){
+    if(bcp == NULL) return;
+    BCP* cabeca = bcp;
     printf("\n\nBCP:\n");
-    printf("Id %d\n",lista->id);
-    printf("Nome %s\n",lista->nome);
-    printf("Estado %c\n",lista->estado);
-    printf("Tempo restante %d\n",lista->tempoRestante);
-    printf("Linha de instrução %d\n",lista->linhaInstrucao);
-    printf("Memória ocupada %dkb\n\n", lista->tamanho);
+    printf("Id %d\n",bcp->id);
+    printf("Nome %s\n",bcp->nome);
+    printf("Estado %c\n",bcp->estado);
+    printf("Tempo restante %d\n",bcp->tempoRestante);
+    printf("Linha de instrução %d\n",bcp->linhaInstrucao);
+    printf("Memória ocupada %dkb\n\n", bcp->tamanho);
 
-    while(lista->proximo != NULL){
-        lista = lista->proximo;
-        printf("Id %d\n",lista->id);
-        printf("Nome %s\n",lista->nome);
-        printf("Estado %c\n",lista->estado);
-        printf("Tempo restante %d\n",lista->tempoRestante);
-        printf("Linha de instrução %d\n",lista->linhaInstrucao);
-        printf("Memória ocupada %dkb\n\n", lista->tamanho);
+    while(bcp->proximo != NULL){
+        bcp = bcp->proximo;
+        printf("Id %d\n",bcp->id);
+        printf("Nome %s\n",bcp->nome);
+        printf("Estado %c\n",bcp->estado);
+        printf("Tempo restante %d\n",bcp->tempoRestante);
+        printf("Linha de instrução %d\n",bcp->linhaInstrucao);
+        printf("Memória ocupada %dkb\n\n", bcp->tamanho);
     }
-    lista = cabeca;
+    bcp = cabeca;
 }
 
 int pid = 0;
@@ -356,7 +356,7 @@ void ShortestRemainingTimeFirst(){
         system("clear");
         executaProcesso();
         finalizar = menu();
-        sleep(3);
+        sleep(1);
     }
 }
 
