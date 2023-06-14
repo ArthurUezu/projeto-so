@@ -1,16 +1,17 @@
 sint2
 2
 3200
+s t
 
 exec 1000
+P(s)
+P(t)
 read 20
 exec 400
 read 30
 exec 500
-P(s)
 exec 200
-P(t)
-exec 20000
+exec 12
 write 20
 print 150
 V(t)
