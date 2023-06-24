@@ -110,7 +110,6 @@ void *gerenciamentoDisco(){ // CONSUMER e PRODUCER
             free(requisicao);
             sem_post(&mutexDisco);
         }
-            
     }
     return NULL;
 }
@@ -219,7 +218,6 @@ void memLoadFinish(BCP * processo){
             break;
         }
     }
-    
 }
 
 void finalizarProcesso(int pid){
@@ -237,6 +235,7 @@ void finalizarProcesso(int pid){
             free(bcp);
             bcp = proximo;
         }
+
         if(bcp != NULL) bcp->estado = ATIVO;
         return;
     }
@@ -263,6 +262,7 @@ void interrupcaoProcesso(){
     if(bcp == NULL){
         return;
     }
+
     if(bcp->proximo == NULL){
         while(bcp->semaforoES == 0);
         return;
@@ -397,7 +397,6 @@ void criarProcesso(char* fonte){
     fscanf(processo->arquivoFonte,"%[^\n]\n",processo->semaforos);
     adicionarProcessoAoBCP(processo);
     memLoadReq(processo);
-
     return;
 }
 
@@ -454,7 +453,6 @@ void executaProcesso(){
         processo->tempoRestante -= tempo;
     }
 
-
     printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %ldmb\n",instrucao,tempo,espfree*8/1000);
 
     if(processo->tempoRestante <= 0 ){
@@ -484,9 +482,7 @@ int menu(){
         printf("1) Adicionar processo\n");
         printf("2) Matar processo\n");
         printf("3) Sair\nDigite: ");
-    
         scanf("%d",&escolha);
-
     }
     switch(escolha){
         case 0: break;
@@ -513,7 +509,6 @@ int menu(){
     return 1;
 }
 
-
 void* ShortestRemainingTimeFirst(){
     
     while(finalizar){
@@ -523,12 +518,8 @@ void* ShortestRemainingTimeFirst(){
     }
 }
 
-
-
-
 int main(int argc, char* argv[]){
-    int sem = 0;
-    sem = sem_init(&mutexDisco, 0, 1);
+    sem_init(&mutexDisco, 0, 1);
     sem_init(&print, 0, 1);
     pthread_attr_t atrib;
     pthread_t disk, cpu;
@@ -545,6 +536,5 @@ int main(int argc, char* argv[]){
     pthread_join(cpu,NULL);
 
     sem_destroy(&mutexDisco);
-
     return 0;
 }
