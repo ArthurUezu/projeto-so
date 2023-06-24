@@ -27,10 +27,18 @@ int semaforos[255];
 int menuAberto = 0;
 
 sem_t mutexDisco;
+sem_t mutexImpressao;
+sem_t mutexProcessador;
 sem_t print;
 
+typedef struct requisicaoImpressao {
+    int pid;
+    int tempo;
+    struct requisicaoImpressao* proximo;
+} requisicaoImpressao;
+
 typedef struct requisicaoDisco {
-    int id;
+    int operacao;
     int pid;
     int trilha;
     struct requisicaoDisco* proximo;   
@@ -51,14 +59,19 @@ typedef struct BCP {
 } BCP;
 
 requisicaoDisco* listaRequisicaoDisco = NULL;
-
+requisicaoImpressao* listaRequisicaoImpressao = NULL;
 BCP* bcp = NULL;
+
 int pid = 0;
 int finalizar = 1;
 
+void printaImpressao();
+void *gerenciamentoImpressao();
+void novaRequisicaoImpressao(int pid, int tempo);
+void finalizarOperacaoImpressao();
 void printaDisco();
 void *gerenciamentoDisco();
-void novaRequisicaoDisco(int pid, int trilha);
+void novaRequisicaoDisco(int pid, int trilha, int operacao);
 void finalizarOperacaoDisco(int pid, int tempo);
 void adicionarProcessoAoBCP(BCP* processo);
 void memLoadReq(BCP * processo);
@@ -75,32 +88,109 @@ int kbhit();
 int menu();
 void* ShortestRemainingTimeFirst();
 
-void printaDisco(){
+void printaImpressao() {
     sem_wait(&print);
-    printf("\n\n==========================\n\nFila de requisição de disco:\n\n ");
-    if(listaRequisicaoDisco == NULL){
+    printf("\n\n==========================\n\nFila de requisição de impressão:\n\n");
+    if(listaRequisicaoImpressao == NULL){
         printf("Fila vazia\n");
-        printf("\n==========================\n\n");
         sem_post(&print);
         return;
     }
-    requisicaoDisco* cabeca = listaRequisicaoDisco;
-    printf("Id processo requistor: %d\n", listaRequisicaoDisco->pid);
-    printf("Trilha sendo lida: %d\n\n", listaRequisicaoDisco->trilha);
-    while(listaRequisicaoDisco->proximo != NULL){
-        printf("Id processo requistor: %d\n", listaRequisicaoDisco->pid);
-        printf("Trilha sendo lida: %d\n\n", listaRequisicaoDisco->trilha);
-        listaRequisicaoDisco = listaRequisicaoDisco->proximo;
+    requisicaoImpressao* cabeca = listaRequisicaoImpressao;
+    printf("Id processo requisitor a imprimir: %d\n", listaRequisicaoImpressao->pid);
+    printf("Tempo restante de impressão: %d\n\n", listaRequisicaoImpressao->tempo);
+    while(listaRequisicaoImpressao->proximo != NULL){
+        printf("Id processo requisitor: %d\n", listaRequisicaoImpressao->pid);
+        printf("Tempo restante de impressão: %d\n\n", listaRequisicaoImpressao->tempo);
+        listaRequisicaoImpressao = listaRequisicaoImpressao->proximo;
     }
-    printf("\n==========================\n\n");
-    listaRequisicaoDisco = cabeca;
+    listaRequisicaoImpressao = cabeca;
     sem_post(&print);
+}
+void *gerenciamentoImpressao(){
+    while(finalizar){
+        requisicaoImpressao* requisicao = listaRequisicaoImpressao;
+        sleep(2);
+        while(menuAberto == 1);
+        if(requisicao != NULL){
+            sem_wait(&mutexImpressao);
+            finalizarOperacaoImpressao();
+            sem_post(&mutexImpressao);
+        }
+    }
+    return NULL;
+}
+
+void novaRequisicaoImpressao(int pid, int tempo){
+    requisicaoImpressao* novaRequisicao = (requisicaoImpressao*) malloc(sizeof(requisicaoImpressao));
+    novaRequisicao->pid = pid;
+    novaRequisicao->tempo = tempo;
+    novaRequisicao->proximo = NULL;
+    sem_wait(&mutexImpressao);
+    if(listaRequisicaoImpressao == NULL){
+        listaRequisicaoImpressao = novaRequisicao;
+        sem_post(&mutexImpressao);
+        return;
+    }
+    requisicaoImpressao* cabeca = listaRequisicaoImpressao;
+    while(listaRequisicaoImpressao->proximo != NULL){
+        listaRequisicaoImpressao = listaRequisicaoImpressao->proximo;
+    }
+
+    listaRequisicaoImpressao->proximo = novaRequisicao;
+    listaRequisicaoImpressao = cabeca;
+    sem_post(&mutexImpressao);
+}
+
+void finalizarOperacaoImpressao() {
+    requisicaoImpressao* requisicao = listaRequisicaoImpressao;
+    listaRequisicaoImpressao = listaRequisicaoImpressao->proximo;
+    sem_wait(&mutexProcessador);
+    BCP* cabeca = bcp; 
+    while(bcp->id != pid && bcp->proximo != NULL){
+        bcp = bcp->proximo;
+    }
+    bcp->tempoRestante -= requisicao->tempo;
+    bcp = cabeca;
+    sem_post(&mutexProcessador);
+    if(bcp->tempoRestante <= 0){
+        finalizarProcesso(bcp->id);
+    }
+    free(requisicao);
+}
+
+
+void printaDisco(){
+    printf("\n\n==========================\n\nFila de requisição de disco:\n\n");
+    if(listaRequisicaoDisco == NULL){
+        printf("Fila vazia\n");
+        return;
+    }
+    requisicaoDisco* cabeca = listaRequisicaoDisco;
+    printf("Id processo requisitor lendo disco: %d\n", cabeca->pid);
+    printf("Trilha sendo lida: %d\n", cabeca->trilha);
+    if(cabeca->trilha){
+        printf("Operação: read\n\n");
+    }
+    else {
+        printf("Operação: write\n\n");
+    }
+    while(cabeca->proximo != NULL){
+        printf("Id processo requisitor: %d\n", cabeca->pid);
+        printf("Trilha a ser lida: %d\n", cabeca->trilha);
+        if(cabeca->trilha){
+        printf("Operação: read\n\n");
+    }
+    else {
+        printf("Operação: write\n\n");
+    }
+        cabeca = cabeca->proximo;
+    }
 }
 
 void *gerenciamentoDisco(){ // CONSUMER e PRODUCER
     while(finalizar){
         requisicaoDisco* requisicao = listaRequisicaoDisco;
-        printaDisco();
         sleep(2);
         while(menuAberto == 1);
         if(requisicao != NULL){
@@ -114,10 +204,11 @@ void *gerenciamentoDisco(){ // CONSUMER e PRODUCER
     return NULL;
 }
 
-void novaRequisicaoDisco(int pid, int trilha){
+void novaRequisicaoDisco(int pid, int trilha, int operacao){
     requisicaoDisco* novaRequisicao = (requisicaoDisco*) malloc(sizeof(requisicaoDisco));
     novaRequisicao->pid = pid;
     novaRequisicao->trilha = trilha;
+    novaRequisicao->operacao = operacao;
     novaRequisicao->proximo = NULL;
     sem_wait(&mutexDisco);
     if(listaRequisicaoDisco == NULL){
@@ -136,12 +227,18 @@ void novaRequisicaoDisco(int pid, int trilha){
 }
 
 void finalizarOperacaoDisco(int pid, int tempo){
+    sem_wait(&mutexProcessador);
     BCP* cabeca = bcp; 
     while(cabeca->id != pid && cabeca->proximo != NULL){
         cabeca = cabeca->proximo;
     }
-    cabeca->semaforoES = 1;
     cabeca->tempoRestante -= tempo;
+    cabeca->semaforoES = 1;
+    cabeca = cabeca;
+    sem_post(&mutexProcessador);
+    if(cabeca->tempoRestante <= 0){
+        finalizarProcesso(cabeca->id);
+    }
     interrupcaoProcesso();
 }
 
@@ -150,24 +247,24 @@ void printaBCP(){
     sem_wait(&print);
     BCP* cabeca = bcp;
     printf("\n\n==========================\n\nBCP:\n");
-    printf("Id %d\n",bcp->id);
-    printf("Nome %s\n",bcp->nome);
-    printf("Estado %c\n",bcp->estado);
-    printf("Tempo restante %d\n",bcp->tempoRestante);
-    printf("Linha de instrução %d\n",bcp->linhaInstrucao);
-    printf("Memória ocupada %dkb\n\n", bcp->tamanho);
+    printf("Id %d\n",cabeca->id);
+    printf("Nome %s\n",cabeca->nome);
+    printf("Estado %c\n",cabeca->estado);
+    printf("Tempo restante %d\n",cabeca->tempoRestante);
+    printf("Linha de instrução %d\n",cabeca->linhaInstrucao);
+    printf("Memória ocupada %dkb\n\n", cabeca->tamanho);
+    printf("Estado do semaforo de ES %d\n\n", cabeca->semaforoES);
 
-    while(bcp->proximo != NULL){
-        bcp = bcp->proximo;
-        printf("Id %d\n",bcp->id);
-        printf("Nome %s\n",bcp->nome);
-        printf("Estado %c\n",bcp->estado);
-        printf("Tempo restante %d\n",bcp->tempoRestante);
-        printf("Linha de instrução %d\n",bcp->linhaInstrucao);
-        printf("Memória ocupada %dkb\n\n", bcp->tamanho);
+    while(cabeca->proximo != NULL){
+        cabeca = cabeca->proximo;
+        printf("Id %d\n",cabeca->id);
+        printf("Nome %s\n",cabeca->nome);
+        printf("Estado %c\n",cabeca->estado);
+        printf("Tempo restante %d\n",cabeca->tempoRestante);
+        printf("Linha de instrução %d\n",cabeca->linhaInstrucao);
+        printf("Memória ocupada %dkb\n\n", cabeca->tamanho);
+        printf("Estado do semaforo de ES %d\n\n", cabeca->semaforoES);
     }
-    bcp = cabeca;
-    printf("==========================\n\n");
     sem_post(&print);
 }
 
@@ -221,6 +318,7 @@ void memLoadFinish(BCP * processo){
 }
 
 void finalizarProcesso(int pid){
+    sem_wait(&mutexProcessador);
     BCP* cabecaLista = bcp;
     BCP* proximo = bcp;
     if(bcp->proximo != NULL) proximo = bcp->proximo;
@@ -237,6 +335,7 @@ void finalizarProcesso(int pid){
         }
 
         if(bcp != NULL) bcp->estado = ATIVO;
+        sem_post(&mutexProcessador);
         return;
     }
     while(proximo != NULL && proximo->id != pid){
@@ -247,6 +346,7 @@ void finalizarProcesso(int pid){
     if(proximo == NULL){
         bcp = cabecaLista;
         printf("\nProcesso não encontrado\n");
+        sem_post(&mutexProcessador);
         return;
     }
 
@@ -255,10 +355,12 @@ void finalizarProcesso(int pid){
     fclose(proximo->arquivoFonte);
     free(proximo);
     memLoadFinish(proximo);
+    sem_post(&mutexProcessador);
     printf("\nProcesso finalizado\n");
 }
 
 void interrupcaoProcesso(){
+    printf("\nInterrompendo");
     if(bcp == NULL){
         return;
     }
@@ -269,7 +371,6 @@ void interrupcaoProcesso(){
     }
 
     if(bcp->semaforoES == 0){
-        printf("\nInterrompendo");
         BCP* proximo = bcp->proximo;
         BCP* aux = bcp;
         if(proximo->semaforoES == 0 && proximo->proximo == NULL){
@@ -290,18 +391,19 @@ void interrupcaoProcesso(){
             proximo = proximo->proximo;
             aux = aux->proximo;
         }
+        if(proximo->semaforoES == 1){
+            aux->estado = ESPERA;
+            aux->proximo = proximo->proximo;
+            proximo->proximo = bcp;
+            proximo->estado = ATIVO;
+            bcp = proximo;
+            return;
+        }
         if(proximo->proximo == NULL){
             printf("\nTodos os processos estão aguardando dados\n");
             while(bcp->semaforoES == 0);
             return;
         }
-        if(proximo->semaforoES == 1){
-            aux->proximo = proximo->proximo;
-            proximo->proximo = bcp;
-            bcp = proximo;
-            return;
-        }
-        
     }
 
     if(bcp->tempoRestante == 0){
@@ -325,7 +427,6 @@ void interrupcaoProcesso(){
     proximo->proximo = bcp;
     proximo->estado = ATIVO;
     bcp = proximo;
-
     return;
 }
 
@@ -418,9 +519,13 @@ void executaProcesso(){
     if(processo->tempoRestante <= 0){
         finalizarProcesso(processo->id);
     }
+    sem_wait(&print);
     printf("Executando processo com PID: %d", processo->id);
     if(feof(processo->arquivoFonte)){
+        sem_post(&print);
+    printf("Executando processo com PID: %d", processo->id);
         interrupcaoProcesso();
+        finalizarProcesso(processo->id);
         return;
     }
     if(processo->estado != ATIVO){
@@ -444,17 +549,24 @@ void executaProcesso(){
     }
 
     processo->linhaInstrucao++;
+    printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %ldmb\n",instrucao,tempo,espfree*8/1000);
     if(strcmp(instrucao,"read") == 0 || strcmp(instrucao,"write") == 0){
         processo->semaforoES = 0;
-        novaRequisicaoDisco(processo->id, tempo);
+        if(strcmp(instrucao, "read")){
+            novaRequisicaoDisco(processo->id, tempo,1);
+        }
+        else {
+            novaRequisicaoDisco(processo->id, tempo,0);
+        }
         interrupcaoProcesso();
+    } else if (strcmp(instrucao,"print") == 0){
+        novaRequisicaoImpressao(processo->id, tempo);
     }
     else{
         processo->tempoRestante -= tempo;
     }
 
-    printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %ldmb\n",instrucao,tempo,espfree*8/1000);
-
+    sem_post(&print);
     if(processo->tempoRestante <= 0 ){
         interrupcaoProcesso();
     }
@@ -473,7 +585,6 @@ int kbhit(){
 
 int menu(){
     int escolha = -1;
-    printaBCP();
     printf("\nAperte ENTER para abrir o menu\n");
     if(kbhit()){
         menuAberto = 1;
@@ -510,19 +621,20 @@ int menu(){
 }
 
 void* ShortestRemainingTimeFirst(){
-    
     while(finalizar){
-        executaProcesso();
-        finalizar = menu();
+        if(menuAberto == 0){
+            executaProcesso();
+        }
         sleep(2);
     }
 }
 
 int main(int argc, char* argv[]){
+    sem_init(&mutexProcessador, 0, 1);
     sem_init(&mutexDisco, 0, 1);
+    sem_init(&mutexImpressao, 0, 1);
     sem_init(&print, 0, 1);
-    pthread_attr_t atrib;
-    pthread_t disk, cpu;
+    pthread_t disco, processador, impressao;
     int i=0;
     for(i=0;i<255;i++){
         semaforos[i] = -100;
@@ -530,11 +642,26 @@ int main(int argc, char* argv[]){
     for(i=1;i<argc;i++){
         criarProcesso(argv[i]);
     }
-    pthread_create(&disk, NULL, gerenciamentoDisco, NULL);
-    pthread_create(&cpu, NULL, ShortestRemainingTimeFirst, NULL);
-    pthread_join(disk,NULL);
-    pthread_join(cpu,NULL);
+    pthread_create(&disco, NULL, gerenciamentoDisco, NULL);
+    pthread_create(&processador, NULL, ShortestRemainingTimeFirst, NULL);
+    pthread_create(&impressao, NULL, gerenciamentoImpressao, NULL);
+    while(finalizar){
+        system("clear");
+        if(menuAberto == 0){
+            printaDisco();
+            printaImpressao();
+            printaBCP();
+        }
+        finalizar = menu();
+        sleep(1);
+    }
+    pthread_join(disco,NULL);
+    pthread_join(processador,NULL);
+    pthread_join(impressao,NULL);
 
+    sem_destroy(&mutexProcessador);
     sem_destroy(&mutexDisco);
+    sem_destroy(&mutexImpressao);
+    sem_destroy(&print);
     return 0;
 }

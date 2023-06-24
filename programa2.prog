@@ -3,10 +3,13 @@ helloworld2
 6400
 s
 
+print 13
 exec 100
 write 200
 write 200
 write 10
+print 100
 write 200
+print 120
 write 300
 write 2000000
