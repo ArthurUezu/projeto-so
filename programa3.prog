@@ -4,12 +4,11 @@ helloworld3
 
 exec 100
 write 200
+read 1050
+write 200
+read 1050
 write 200
 read 1050
 write 10
-write 200
-read 1050
 read 1050
 write 300
-write 200
-read 1050

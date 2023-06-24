@@ -6,13 +6,15 @@
 
 */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/select.h>
+#include <pthread.h>
+#include <semaphore.h>
+
 #define ATIVO 'a'
 #define PRONTO 'p'
 #define ESPERA 'e'
@@ -22,6 +24,17 @@ int memoria[125000]; //125000 posições, cada posição corresponde a 8kbytes
 long espfree=125000;
 
 int semaforos[255];
+int menuAberto = 0;
+
+sem_t mutexDisco;
+sem_t print;
+
+typedef struct requisicaoDisco {
+    int id;
+    int pid;
+    int trilha;
+    struct requisicaoDisco* proximo;   
+} requisicaoDisco;
 
 typedef struct BCP {
     int id;
@@ -31,19 +44,113 @@ typedef struct BCP {
     int linhaInstrucao;
     int posicaoMemoria;
     int tamanho;
+    int semaforoES;
     FILE* arquivoFonte;
     char semaforos[255];
     struct BCP* proximo;
 } BCP;
 
-BCP* bcp = NULL;
+requisicaoDisco* listaRequisicaoDisco = NULL;
 
+BCP* bcp = NULL;
+int pid = 0;
+int finalizar = 1;
+
+void printaDisco();
+void *gerenciamentoDisco();
+void novaRequisicaoDisco(int pid, int trilha);
+void finalizarOperacaoDisco(int pid, int tempo);
 void adicionarProcessoAoBCP(BCP* processo);
+void memLoadReq(BCP * processo);
+void inicializaSemaforo(char identificador);
+void semaforoV(char identificador, int pid);
+void semaforoP(char identificador, int pid);
+void memLoadFinish(BCP * processo);
+void finalizarProcesso(int pid);
+void interrupcaoProcesso();
+void criarProcesso(char* fonte);
+void limparBCP();
+void executaProcesso();
+int kbhit();
+int menu();
+void* ShortestRemainingTimeFirst();
+
+void printaDisco(){
+    sem_wait(&print);
+    printf("\n\n==========================\n\nFila de requisição de disco:\n\n ");
+    if(listaRequisicaoDisco == NULL){
+        printf("Fila vazia\n");
+        printf("\n==========================\n\n");
+        sem_post(&print);
+        return;
+    }
+    requisicaoDisco* cabeca = listaRequisicaoDisco;
+    printf("Id processo requistor: %d\n", listaRequisicaoDisco->pid);
+    printf("Trilha sendo lida: %d\n\n", listaRequisicaoDisco->trilha);
+    while(listaRequisicaoDisco->proximo != NULL){
+        printf("Id processo requistor: %d\n", listaRequisicaoDisco->pid);
+        printf("Trilha sendo lida: %d\n\n", listaRequisicaoDisco->trilha);
+        listaRequisicaoDisco = listaRequisicaoDisco->proximo;
+    }
+    printf("\n==========================\n\n");
+    listaRequisicaoDisco = cabeca;
+    sem_post(&print);
+}
+
+void *gerenciamentoDisco(){ // CONSUMER e PRODUCER
+    while(finalizar){
+        requisicaoDisco* requisicao = listaRequisicaoDisco;
+        printaDisco();
+        sleep(2);
+        while(menuAberto == 1);
+        if(requisicao != NULL){
+            sem_wait(&mutexDisco);
+            listaRequisicaoDisco = listaRequisicaoDisco->proximo;
+            finalizarOperacaoDisco(requisicao->pid, requisicao->trilha);
+            free(requisicao);
+            sem_post(&mutexDisco);
+        }
+            
+    }
+    return NULL;
+}
+
+void novaRequisicaoDisco(int pid, int trilha){
+    requisicaoDisco* novaRequisicao = (requisicaoDisco*) malloc(sizeof(requisicaoDisco));
+    novaRequisicao->pid = pid;
+    novaRequisicao->trilha = trilha;
+    novaRequisicao->proximo = NULL;
+    sem_wait(&mutexDisco);
+    if(listaRequisicaoDisco == NULL){
+        listaRequisicaoDisco = novaRequisicao;
+        sem_post(&mutexDisco);
+        return;
+    }
+    requisicaoDisco* cabeca = listaRequisicaoDisco;
+    while(listaRequisicaoDisco->proximo != NULL){
+        listaRequisicaoDisco = listaRequisicaoDisco->proximo;
+    }
+
+    listaRequisicaoDisco->proximo = novaRequisicao;
+    listaRequisicaoDisco = cabeca;
+    sem_post(&mutexDisco);
+}
+
+void finalizarOperacaoDisco(int pid, int tempo){
+    BCP* cabeca = bcp; 
+    while(cabeca->id != pid && cabeca->proximo != NULL){
+        cabeca = cabeca->proximo;
+    }
+    cabeca->semaforoES = 1;
+    cabeca->tempoRestante -= tempo;
+    interrupcaoProcesso();
+}
 
 void printaBCP(){
     if(bcp == NULL) return;
+    sem_wait(&print);
     BCP* cabeca = bcp;
-    printf("\n\nBCP:\n");
+    printf("\n\n==========================\n\nBCP:\n");
     printf("Id %d\n",bcp->id);
     printf("Nome %s\n",bcp->nome);
     printf("Estado %c\n",bcp->estado);
@@ -61,9 +168,11 @@ void printaBCP(){
         printf("Memória ocupada %dkb\n\n", bcp->tamanho);
     }
     bcp = cabeca;
+    printf("==========================\n\n");
+    sem_post(&print);
 }
 
-int pid = 0;
+
 
 void memLoadReq(BCP * processo){
     BCP * process = processo;
@@ -151,6 +260,56 @@ void finalizarProcesso(int pid){
 }
 
 void interrupcaoProcesso(){
+    if(bcp == NULL){
+        return;
+    }
+    if(bcp->proximo == NULL){
+        while(bcp->semaforoES == 0);
+        return;
+    }
+
+    if(bcp->semaforoES == 0){
+        printf("\nInterrompendo");
+        BCP* proximo = bcp->proximo;
+        BCP* aux = bcp;
+        if(proximo->semaforoES == 0 && proximo->proximo == NULL){
+            if(listaRequisicaoDisco->pid == bcp->id){
+                while(bcp->semaforoES == 0);
+                return;
+            } else {
+                bcp->estado = ESPERA;
+                bcp->proximo = proximo->proximo;
+                proximo->proximo = bcp;
+                proximo->estado = ATIVO;
+                bcp = proximo;
+                while(bcp->semaforoES == 0);
+                return;
+            }
+        }
+        while(proximo->proximo != NULL && proximo->semaforoES == 0){
+            proximo = proximo->proximo;
+            aux = aux->proximo;
+        }
+        if(proximo->proximo == NULL){
+            printf("\nTodos os processos estão aguardando dados\n");
+            while(bcp->semaforoES == 0);
+            return;
+        }
+        if(proximo->semaforoES == 1){
+            aux->proximo = proximo->proximo;
+            proximo->proximo = bcp;
+            bcp = proximo;
+            return;
+        }
+        
+    }
+
+    if(bcp->tempoRestante == 0){
+        printf("\nExecução do processo chegou ao fim.\n");
+        finalizarProcesso(bcp->id);
+        return;
+    }
+
     for(int i=0;i<strlen(bcp->semaforos);i++){
         if(bcp->semaforos[i] == '\0'){
             continue;
@@ -158,21 +317,14 @@ void interrupcaoProcesso(){
         if(semaforos[bcp->semaforos[i]] == 0){
             return;
         }
-
     }
-    if(bcp->tempoRestante == 0){
-        printf("\nExecução do processo chegou ao fim.\n");
-        finalizarProcesso(bcp->id);
-        return;
-    }
-    if(bcp->proximo != NULL){
-        BCP* proximo = bcp->proximo;
-        bcp->estado = ESPERA;
-        bcp->proximo = proximo->proximo;
-        proximo->proximo = bcp;
-        proximo->estado = ATIVO;
-        bcp = proximo;
-    }
+    
+    BCP* proximo = bcp->proximo;
+    bcp->estado = ESPERA;
+    bcp->proximo = proximo->proximo;
+    proximo->proximo = bcp;
+    proximo->estado = ATIVO;
+    bcp = proximo;
 
     return;
 }
@@ -215,7 +367,7 @@ void criarProcesso(char* fonte){
     BCP* processo = (BCP*) malloc(sizeof(BCP));
     processo->arquivoFonte = fopen(strcat(aux,fonte),"r");
     processo->proximo = NULL;
-
+    processo->semaforoES = 1;
     fscanf(processo->arquivoFonte,"%s\n",processo->nome);
     fscanf(processo->arquivoFonte,"%d\n",&processo->id);
     fscanf(processo->arquivoFonte,"%d\n",&processo->tamanho);
@@ -249,9 +401,6 @@ void criarProcesso(char* fonte){
     return;
 }
 
-
-
-
 void limparBCP(){
     BCP* aux = bcp;
     while(bcp->proximo != NULL){
@@ -267,6 +416,9 @@ void executaProcesso(){
         printf("\nBCP vazio, para adicionar processos, abra o menu\n");
         return;
     }
+    if(processo->tempoRestante <= 0){
+        finalizarProcesso(processo->id);
+    }
     printf("Executando processo com PID: %d", processo->id);
     if(feof(processo->arquivoFonte)){
         interrupcaoProcesso();
@@ -278,6 +430,7 @@ void executaProcesso(){
     char instrucao[40] = "";
     int tempo = 0;
     fscanf(processo->arquivoFonte,"%s",instrucao);
+
     if(instrucao[0]=='P' || instrucao[0]=='V'){
         if(instrucao[0]=='P'){
             semaforoP(instrucao[2],processo->id);
@@ -287,12 +440,21 @@ void executaProcesso(){
         }
 
         tempo = 200;
-
     } else {
         fscanf(processo->arquivoFonte,"%d\n",&tempo);
     }
+
     processo->linhaInstrucao++;
-    processo->tempoRestante -= tempo;
+    if(strcmp(instrucao,"read") == 0 || strcmp(instrucao,"write") == 0){
+        processo->semaforoES = 0;
+        novaRequisicaoDisco(processo->id, tempo);
+        interrupcaoProcesso();
+    }
+    else{
+        processo->tempoRestante -= tempo;
+    }
+
+
     printf("\nInstrução: %s\nTempo de execução: %d\nMemória disponível: %ldmb\n",instrucao,tempo,espfree*8/1000);
 
     if(processo->tempoRestante <= 0 ){
@@ -300,8 +462,7 @@ void executaProcesso(){
     }
 }
 
-int kbhit()
-{
+int kbhit(){
     struct timeval tv;
     fd_set fds;
     tv.tv_sec = 0;
@@ -314,24 +475,28 @@ int kbhit()
 
 int menu(){
     int escolha = -1;
-    printaBCP(bcp);
+    printaBCP();
     printf("\nAperte ENTER para abrir o menu\n");
     if(kbhit()){
+        menuAberto = 1;
         printf("\n\nDigite a opção!\n");
+        printf("0) Voltar a execução\n");
         printf("1) Adicionar processo\n");
         printf("2) Matar processo\n");
         printf("3) Sair\nDigite: ");
     
         scanf("%d",&escolha);
+
     }
     switch(escolha){
-        
-        case 1:
+        case 0: break;
+        case 1:{
             char arquivo[50] = "";
             printf("\n\nDigite o PATH ('./nomearquivo')\nDigite: ");
             scanf("%s",arquivo);
             criarProcesso(arquivo);
             break;
+        }
         case 2:
             printf("\n\nDigite o id do processo que deseja matar\nDigite: ");
             scanf("%d",&escolha);
@@ -343,24 +508,30 @@ int menu(){
                 finalizarProcesso(bcp->id);
             return 0;
             break;
-        
-
     }
+    menuAberto = 0;
     return 1;
 }
 
 
-void ShortestRemainingTimeFirst(){
-    int finalizar = 1;
+void* ShortestRemainingTimeFirst(){
+    
     while(finalizar){
-        system("clear");
         executaProcesso();
         finalizar = menu();
-        sleep(1);
+        sleep(2);
     }
 }
 
+
+
+
 int main(int argc, char* argv[]){
+    int sem = 0;
+    sem = sem_init(&mutexDisco, 0, 1);
+    sem_init(&print, 0, 1);
+    pthread_attr_t atrib;
+    pthread_t disk, cpu;
     int i=0;
     for(i=0;i<255;i++){
         semaforos[i] = -100;
@@ -368,6 +539,12 @@ int main(int argc, char* argv[]){
     for(i=1;i<argc;i++){
         criarProcesso(argv[i]);
     }
-    ShortestRemainingTimeFirst();
+    pthread_create(&disk, NULL, gerenciamentoDisco, NULL);
+    pthread_create(&cpu, NULL, ShortestRemainingTimeFirst, NULL);
+    pthread_join(disk,NULL);
+    pthread_join(cpu,NULL);
+
+    sem_destroy(&mutexDisco);
+
     return 0;
 }
