@@ -510,6 +510,24 @@ void limparBCP(){
     }
 }
 
+void limparFilaImp(){
+    requisicaoImpressao* aux = listaRequisicaoImpressao;
+    while(listaRequisicaoImpressao->proximo != NULL){
+        listaRequisicaoImpressao = listaRequisicaoImpressao->proximo;
+        free(aux);
+        aux = listaRequisicaoImpressao;
+    }
+}
+
+void limparFilaDisc(){
+    requisicaoDisco* aux = listaRequisicaoDisco;
+    while(listaRequisicaoDisco->proximo != NULL){
+        listaRequisicaoDisco = listaRequisicaoDisco->proximo;
+        free(aux);
+        aux = listaRequisicaoDisco;
+    }
+}
+
 void executaProcesso(){
     BCP* processo = bcp;
     if(processo == NULL) {
@@ -655,6 +673,8 @@ int main(int argc, char* argv[]){
         finalizar = menu();
         sleep(1);
     }
+    limparFilaDisc();
+    limparFilaImp();
     pthread_join(disco,NULL);
     pthread_join(processador,NULL);
     pthread_join(impressao,NULL);
