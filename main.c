@@ -175,6 +175,7 @@ void printaDisco(){
     else {
         printf("Operação: write\n\n");
     }
+    
     while(cabeca->proximo != NULL){
         printf("Id processo requisitor: %d\n", cabeca->pid);
         printf("Trilha a ser lida: %d\n", cabeca->trilha);
@@ -240,6 +241,10 @@ void finalizarOperacaoDisco(int pid, int tempo){
         finalizarProcesso(cabeca->id);
     }
     interrupcaoProcesso();
+}
+
+void trataconcorrencia( ){
+
 }
 
 void printaBCP(){
@@ -376,7 +381,7 @@ void interrupcaoProcesso(){
         if(proximo->semaforoES == 0 && proximo->proximo == NULL){
             if(listaRequisicaoDisco->pid == bcp->id){
                 while(bcp->semaforoES == 0);
-                return;
+                return; 
             } else {
                 bcp->estado = ESPERA;
                 bcp->proximo = proximo->proximo;
@@ -622,17 +627,19 @@ int menu(){
             criarProcesso(arquivo);
             break;
         }
-        case 2:
+        case 2:{
             printf("\n\nDigite o id do processo que deseja matar\nDigite: ");
             scanf("%d",&escolha);
             finalizarProcesso(escolha);
             break;
-        case 3:
+        }
+        case 3:{
             limparBCP();
             if(bcp != NULL)
                 finalizarProcesso(bcp->id);
             return 0;
             break;
+        }
     }
     menuAberto = 0;
     return 1;
